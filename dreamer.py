@@ -4,7 +4,10 @@ import os
 import pathlib
 import sys
 
-os.environ["MUJOCO_GL"] = "osmesa"
+if os.name == "nt":
+    os.environ["MUJOCO_GL"] = "glfw"
+else:
+    os.environ.setdefault("MUJOCO_GL", "egl")
 
 import numpy as np
 import ruamel.yaml as yaml
