@@ -362,6 +362,20 @@ def sample_episodes(episodes, length, seed=0):
 
 
 def load_episodes(directory, limit=None, reverse=True):
+    # episodes = OrderedDict({
+    #     "episode_001": {
+    #         "obs": np.array([...]),
+    #         "action": np.array([...]),
+    #         "reward": np.array([...]),
+    #         "done": np.array([...])
+    #     },
+    #     "episode_002": {
+    #         "obs": np.array([...]),
+    #         "action": np.array([...]),
+    #         "reward": np.array([...]),
+    #         "done": np.array([...])
+    #     }
+    # })
     directory = pathlib.Path(directory).expanduser()
     episodes = collections.OrderedDict()
     total = 0

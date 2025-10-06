@@ -86,6 +86,7 @@ class Dreamer(nn.Module):
             self._logger.step = self._config.action_repeat * self._step
         return policy_output, state
 
+    #输入：原始观测与上一步的隐状态 (latent, action)。输出：当前动作与新的隐状态。
     def _policy(self, obs, state, training):
         if state is None:
             latent = action = None
@@ -148,6 +149,7 @@ def make_dataset(episodes, config):
 
 def make_env(config, mode, id):
     suite, task = config.task.split("_", 1)
+    #dmc walker_walk
     if suite == "dmc":
         import envs.dmc as dmc
 
@@ -207,9 +209,12 @@ def make_env(config, mode, id):
 
 
 def main(config):
+    #为np.cuda设置相同的随机种子
     tools.set_seed_everywhere(config.seed)
+
     if config.deterministic_run:
         tools.enable_deterministic_run()
+
     logdir = pathlib.Path(config.logdir).expanduser()
     config.traindir = config.traindir or logdir / "train_eps"
     config.evaldir = config.evaldir or logdir / "eval_eps"
@@ -222,6 +227,8 @@ def main(config):
     logdir.mkdir(parents=True, exist_ok=True)
     config.traindir.mkdir(parents=True, exist_ok=True)
     config.evaldir.mkdir(parents=True, exist_ok=True)
+
+    #确定训练从哪一步开始
     step = count_steps(config.traindir)
     # step in logger is environmental step
     logger = tools.Logger(logdir, config.action_repeat * step)
@@ -236,8 +243,12 @@ def main(config):
         directory = config.offline_evaldir.format(**vars(config))
     else:
         directory = config.evaldir
+    #或取过去训练的结果
     eval_eps = tools.load_episodes(directory, limit=1)
+
+    # print(eval_eps)
     make = lambda mode, id: make_env(config, mode, id)
+
     train_envs = [make("train", i) for i in range(config.envs)]
     eval_envs = [make("eval", i) for i in range(config.envs)]
     if config.parallel:
@@ -251,6 +262,7 @@ def main(config):
     config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]
 
     state = None
+    print(264, config.offline_traindir)
     if not config.offline_traindir:
         prefill = max(0, config.prefill - count_steps(config.traindir))
         print(f"Prefill dataset ({prefill} steps).")
@@ -287,6 +299,8 @@ def main(config):
     print("Simulate agent.")
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
+    print(301,train_envs[0].observation_space,
+        train_envs[0].action_space,)
     agent = Dreamer(
         train_envs[0].observation_space,
         train_envs[0].action_space,
@@ -343,13 +357,23 @@ def main(config):
 
 
 if __name__ == "__main__":
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--configs", nargs="+")
+    # args, remaining = parser.parse_known_args()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+")
-    args, remaining = parser.parse_known_args()
+
+    args, remaining = parser.parse_known_args([
+        "--configs", "dmc_vision",
+        "--task", "dmc_walker_walk",
+        "--logdir", "./logdir/dmc_walker_walk"
+    ])
+
     configs = yaml.safe_load(
         (pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text()
     )
-
+    # print(configs)
     def recursive_update(base, update):
         for key, value in update.items():
             if isinstance(value, dict) and key in base:
@@ -358,11 +382,15 @@ if __name__ == "__main__":
                 base[key] = value
 
     name_list = ["defaults", *args.configs] if args.configs else ["defaults"]
+
     defaults = {}
     for name in name_list:
         recursive_update(defaults, configs[name])
+
     parser = argparse.ArgumentParser()
     for key, value in sorted(defaults.items(), key=lambda x: x[0]):
+
         arg_type = tools.args_type(value)
         parser.add_argument(f"--{key}", type=arg_type, default=arg_type(value))
+    print(parser.parse_args(remaining))
     main(parser.parse_args(remaining))
