@@ -215,6 +215,8 @@ def main(config):
     if config.deterministic_run:
         tools.enable_deterministic_run()
 
+    print(config.logdir)
+
     logdir = pathlib.Path(config.logdir).expanduser()
     config.traindir = config.traindir or logdir / "train_eps"
     config.evaldir = config.evaldir or logdir / "eval_eps"
@@ -248,6 +250,12 @@ def main(config):
 
     # print(eval_eps)
     make = lambda mode, id: make_env(config, mode, id)
+    # obs.shape: (64, 64, 3)
+    #
+    # Step0:
+    # action = [-0.32  0.77 - 0.21  0.56 - 0.10  0.89]
+    # reward = 0.04
+    # obs.shape = (64, 64, 3)
 
     train_envs = [make("train", i) for i in range(config.envs)]
     eval_envs = [make("eval", i) for i in range(config.envs)]
@@ -258,12 +266,16 @@ def main(config):
         train_envs = [Damy(env) for env in train_envs]
         eval_envs = [Damy(env) for env in eval_envs]
     acts = train_envs[0].action_space
+    #[-1,1] * 6 , 一个6维的图像，连续空间
     print("Action Space", acts)
-    config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]
 
+    #只有离散动作空间才有.n属性
+    config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]  #6
     state = None
     print(264, config.offline_traindir)
+
     if not config.offline_traindir:
+        print(278)
         prefill = max(0, config.prefill - count_steps(config.traindir))
         print(f"Prefill dataset ({prefill} steps).")
         if hasattr(acts, "discrete"):
@@ -279,11 +291,24 @@ def main(config):
                 1,
             )
 
+        # observation(o)：当前观测；
+        # done(d)：是否 episode结束；
+        # state(s)：agent内部记忆状态（比如RNN隐状态)
+        #logprob对应动作概率，用于行为克隆 / IRL等训练（这里可忽略）
         def random_agent(o, d, s):
             action = random_actor.sample()
             logprob = random_actor.log_prob(action)
             return {"action": action, "logprob": logprob}, None
 
+        # print(random_agent(0,0,0))
+        # sys.exit()
+        #random_agent返回值
+        # ({'action': tensor([[-0.0075, 0.5364, -0.8230, -0.7359, -0.3852, 0.2682],
+        #                     [-0.0198, 0.7929, -0.0887, 0.2646, -0.3022, -0.1966],
+        #                     [-0.9553, -0.6623, -0.4122, 0.0370, 0.3953, 0.6000],
+        #                     [-0.6779, -0.4355, 0.3632, 0.8304, -0.2058, 0.7483]]),
+        #   'logprob': tensor([-4.1589, -4.1589, -4.1589, -4.1589])}, None)
+        #
         state = tools.simulate(
             random_agent,
             train_envs,
@@ -297,6 +322,7 @@ def main(config):
         print(f"Logger: ({logger.step} steps).")
 
     print("Simulate agent.")
+
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
     print(301,train_envs[0].observation_space,
@@ -386,11 +412,13 @@ if __name__ == "__main__":
     defaults = {}
     for name in name_list:
         recursive_update(defaults, configs[name])
-
+    # print(393, defaults)
     parser = argparse.ArgumentParser()
-    for key, value in sorted(defaults.items(), key=lambda x: x[0]):
 
+
+    for key, value in sorted(defaults.items(), key=lambda x: x[0]):
         arg_type = tools.args_type(value)
+        # print(arg_type)
         parser.add_argument(f"--{key}", type=arg_type, default=arg_type(value))
-    print(parser.parse_args(remaining))
+
     main(parser.parse_args(remaining))

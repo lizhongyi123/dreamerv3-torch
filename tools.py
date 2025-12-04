@@ -785,7 +785,7 @@ class Optimizer:
         for var in varibs:
             var.data = (1 - self._wd) * var.data
 
-
+#args_type(default) 会返回一个函数，这个函数能把输入 x 转换成与 default 相同类型的对象
 def args_type(default):
     def parse_string(x):
         if default is None:
