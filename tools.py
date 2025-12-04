@@ -5,6 +5,7 @@ import os
 import json
 import pathlib
 import re
+import sys
 import time
 import random
 
@@ -163,6 +164,7 @@ def simulate(
                 add_to_cache(cache, envs[index].id, t)
                 # replace obs with done by initial state
                 obs[index] = result
+
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
         action, agent_state = agent(obs, done, agent_state)
@@ -214,7 +216,7 @@ def simulate(
                         )
                         # log items won't be used later
                         cache[envs[i].id].pop(key)
-
+#训练模式
                 if not is_eval:
                     step_in_dataset = erase_over_episodes(cache, limit)
                     logger.scalar(f"dataset_size", step_in_dataset)

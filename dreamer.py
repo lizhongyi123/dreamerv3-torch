@@ -241,13 +241,18 @@ def main(config):
     else:
         directory = config.traindir
     train_eps = tools.load_episodes(directory, limit=config.dataset_size)
+    # print(244, train_eps["20251006T142028-f223bc1914b840328ed40622551f6a4c-501"].keys())
+    # sys.exit()
     if config.offline_evaldir:
         directory = config.offline_evaldir.format(**vars(config))
     else:
         directory = config.evaldir
     #或取过去训练的结果
     eval_eps = tools.load_episodes(directory, limit=1)
-
+    # print(250, eval_eps['20251006T141549-e7a0ba23eeff43b8849fcbb3982a8d19-501'])
+    # dict_keys(['orientations', 'height', 'velocity', 'image', 'is_terminal', 'is_first', 'reward', 'discount', 'action',
+    #            'logprob'])
+    # sys.exit()
     # print(eval_eps)
     make = lambda mode, id: make_env(config, mode, id)
     # obs.shape: (64, 64, 3)
