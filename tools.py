@@ -146,6 +146,8 @@ def simulate(
         obs = [None] * len(envs)
         agent_state = None
         reward = [0] * len(envs)
+        # print(reward)
+        # sys.exit()
     else:
         step, episode, done, length, obs, agent_state, reward = state
     while (steps and step < steps) or (episodes and episode < episodes):
@@ -154,13 +156,28 @@ def simulate(
             indices = [index for index, d in enumerate(done) if d]
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
+
+            # results = [
+            #     {'image': ..., 'height': ..., 'velocity': ...},
+            #     {...},
+            #     ...
+            # ]
+
             for index, result in zip(indices, results):
                 t = result.copy()
                 t = {k: convert(v) for k, v in t.items()}
+                # print(t)
+                # sys.exit()
                 # action will be added to transition in add_to_cache
                 t["reward"] = 0.0
                 t["discount"] = 1.0
                 # initial state should be added to cache
+                # print(cache.keys())
+                # sys.exit()
+                # print(envs[0].id, envs[1].id)
+                # 20251205T092927 - bde377796a154a31a29cd5f027c72aa3
+                # 20251205T092927 - 9827890dd44c41618e6b9d3c50457735
+
                 add_to_cache(cache, envs[index].id, t)
                 # replace obs with done by initial state
                 obs[index] = result
@@ -175,14 +192,27 @@ def simulate(
             ]
         else:
             action = np.array(action)
+        # print(action)
+        # [{'action': array([0.97897524, 0.864036, -0.6124351, -0.9799949, 0.03464929,
+        #                    -0.99895436], dtype=float32),
+        #                    'logprob': array(6.914168, dtype=float32)},
+
+
         assert len(action) == len(envs)
         # step envs
         results = [e.step(a) for e, a in zip(envs, action)]
         results = [r() for r in results]
+
         obs, reward, done = zip(*[p[:3] for p in results])
+        #这里的obs是一个字典
+        #把四个结果汇总
         obs = list(obs)
+        print(obs)
+        # [{}, {}, {}]
+        # sys.exit()
         reward = list(reward)
         done = np.stack(done)
+        #完成任务的数量
         episode += int(done.sum())
         length += 1
         step += len(envs)
@@ -203,6 +233,7 @@ def simulate(
         if done.any():
             indices = [index for index, d in enumerate(done) if d]
             # logging for done episode
+            #对于完成的情况
             for i in indices:
                 save_episodes(directory, {envs[i].id: cache[envs[i].id]})
                 length = len(cache[envs[i].id]["reward"]) - 1
@@ -252,6 +283,7 @@ def simulate(
 
 
 def add_to_cache(cache, id, transition):
+    # transition = { }
     if id not in cache:
         cache[id] = dict()
         for key, val in transition.items():
@@ -259,6 +291,7 @@ def add_to_cache(cache, id, transition):
     else:
         for key, val in transition.items():
             if key not in cache[id]:
+                #为了处理第一步有一部分数据缺失，只在第二步运行
                 # fill missing data(action, etc.) at second time
                 cache[id][key] = [convert(0 * val)]
                 cache[id][key].append(convert(val))
@@ -330,6 +363,8 @@ def sample_episodes(episodes, length, seed=0):
         p = np.array(
             [len(next(iter(episode.values()))) for episode in episodes.values()]
         )
+        # p = np.array([120, 260, 85, 300])
+
         p = p / np.sum(p)
         while size < length:
             episode = np_random.choice(list(episodes.values()), p=p)
@@ -360,6 +395,15 @@ def sample_episodes(episodes, length, seed=0):
                 if "is_first" in ret:
                     ret["is_first"][size] = True
             size = len(next(iter(ret.values())))
+
+            # {
+            #     'image': [50, H, W, C],
+            #     'action': [50, act_dim],
+            #     'reward': [50],
+            #     'discount': [50],
+            #     'is_first': [50],
+            #     ...
+            # }
         yield ret
 
 

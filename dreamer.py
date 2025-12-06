@@ -142,6 +142,7 @@ def count_steps(folder):
 
 
 def make_dataset(episodes, config):
+    print(145)
     generator = tools.sample_episodes(episodes, config.batch_length)
     dataset = tools.from_generator(generator, config.batch_size)
     return dataset
@@ -241,6 +242,7 @@ def main(config):
     else:
         directory = config.traindir
     train_eps = tools.load_episodes(directory, limit=config.dataset_size)
+
     # print(244, train_eps["20251006T142028-f223bc1914b840328ed40622551f6a4c-501"].keys())
     # sys.exit()
     if config.offline_evaldir:
@@ -314,15 +316,15 @@ def main(config):
         #                     [-0.6779, -0.4355, 0.3632, 0.8304, -0.2058, 0.7483]]),
         #   'logprob': tensor([-4.1589, -4.1589, -4.1589, -4.1589])}, None)
         #
-        state = tools.simulate(
-            random_agent,
-            train_envs,
-            train_eps,
-            config.traindir,
-            logger,
-            limit=config.dataset_size,
-            steps=prefill,
-        )
+        # state = tools.simulate(
+        #     random_agent,
+        #     train_envs,
+        #     train_eps,
+        #     config.traindir,
+        #     logger,
+        #     limit=config.dataset_size,
+        #     steps=prefill,
+        # )
         logger.step += prefill * config.action_repeat
         print(f"Logger: ({logger.step} steps).")
 
@@ -330,8 +332,23 @@ def main(config):
 
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
+
     print(301,train_envs[0].observation_space,
         train_envs[0].action_space,)
+    # Dict(height: Box(-inf, inf, (1,), float32),
+    # image: Box(0, 255, (64, 64, 3), uint8),
+    # orientations: Box(-inf, inf, (14,), float32),
+    # velocity: Box( -inf, inf, (9,), float32))
+    # Box(-1.0, 1.0, (6,), float32)
+
+    # data = {
+    #     'image': [16, 50, H, W, C],  # 图像序列
+    #     'action': [16, 50, act_dim],  # 动作序列
+    #     'reward': [16, 50],  # 回报序列
+    #     'discount': [16, 50],  # 折扣因子
+    #     'is_first': [16, 50],  # 标记序列起点
+    #     ...
+    # }
     agent = Dreamer(
         train_envs[0].observation_space,
         train_envs[0].action_space,
