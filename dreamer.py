@@ -46,12 +46,14 @@ class Dreamer(nn.Module):
         self._dataset = dataset
         self._wm = models.WorldModel(obs_space, act_space, self._step, config)
         self._task_behavior = models.ImagBehavior(config, self._wm)
+        # 在想象空间（world model里roll out的latent）上训练
         if (
             config.compile and os.name != "nt"
         ):  # compilation is not supported on windows
             self._wm = torch.compile(self._wm)
             self._task_behavior = torch.compile(self._task_behavior)
         reward = lambda f, s, a: self._wm.heads["reward"](f).mean()
+        # 探索策略
         self._expl_behavior = dict(
             greedy=lambda: self._task_behavior,
             random=lambda: expl.Random(config, act_space),
@@ -69,6 +71,7 @@ class Dreamer(nn.Module):
             for _ in range(steps):
                 self._train(next(self._dataset))
                 self._update_count += 1
+                #记录更新次数
                 self._metrics["update_count"] = self._update_count
             if self._should_log(step):
                 for name, values in self._metrics.items():
@@ -89,15 +92,17 @@ class Dreamer(nn.Module):
     #输入：原始观测与上一步的隐状态 (latent, action)。输出：当前动作与新的隐状态。
     def _policy(self, obs, state, training):
         if state is None:
+            # RSSM的信念状态
             latent = action = None
         else:
+
             latent, action = state
-        obs = self._wm.preprocess(obs)
+        obs = self._wm.preprocess(obs)    #xt
         embed = self._wm.encoder(obs)
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
-        feat = self._wm.dynamics.get_feat(latent)
+        feat = self._wm.dynamics.get_feat(latent)  #v zt
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
@@ -142,6 +147,7 @@ def count_steps(folder):
 
 
 def make_dataset(episodes, config):
+    print(145)
     generator = tools.sample_episodes(episodes, config.batch_length)
     dataset = tools.from_generator(generator, config.batch_size)
     return dataset
@@ -241,6 +247,7 @@ def main(config):
     else:
         directory = config.traindir
     train_eps = tools.load_episodes(directory, limit=config.dataset_size)
+
     # print(244, train_eps["20251006T142028-f223bc1914b840328ed40622551f6a4c-501"].keys())
     # sys.exit()
     if config.offline_evaldir:
@@ -314,15 +321,15 @@ def main(config):
         #                     [-0.6779, -0.4355, 0.3632, 0.8304, -0.2058, 0.7483]]),
         #   'logprob': tensor([-4.1589, -4.1589, -4.1589, -4.1589])}, None)
         #
-        state = tools.simulate(
-            random_agent,
-            train_envs,
-            train_eps,
-            config.traindir,
-            logger,
-            limit=config.dataset_size,
-            steps=prefill,
-        )
+        # state = tools.simulate(
+        #     random_agent,
+        #     train_envs,
+        #     train_eps,
+        #     config.traindir,
+        #     logger,
+        #     limit=config.dataset_size,
+        #     steps=prefill,
+        # )
         logger.step += prefill * config.action_repeat
         print(f"Logger: ({logger.step} steps).")
 
@@ -330,8 +337,27 @@ def main(config):
 
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
+
     print(301,train_envs[0].observation_space,
         train_envs[0].action_space,)
+<<<<<<< HEAD
+
+=======
+    # Dict(height: Box(-inf, inf, (1,), float32),
+    # image: Box(0, 255, (64, 64, 3), uint8),
+    # orientations: Box(-inf, inf, (14,), float32),
+    # velocity: Box( -inf, inf, (9,), float32))
+    # Box(-1.0, 1.0, (6,), float32)
+
+    # data = {
+    #     'image': [16, 50, H, W, C],  # 图像序列
+    #     'action': [16, 50, act_dim],  # 动作序列
+    #     'reward': [16, 50],  # 回报序列
+    #     'discount': [16, 50],  # 折扣因子
+    #     'is_first': [16, 50],  # 标记序列起点
+    #     ...
+    # }
+>>>>>>> 0ae6ec6eac057dce572adab38dd7f25f7ab0b49e
     agent = Dreamer(
         train_envs[0].observation_space,
         train_envs[0].action_space,
@@ -339,6 +365,7 @@ def main(config):
         logger,
         train_dataset,
     ).to(config.device)
+
     agent.requires_grad_(requires_grad=False)
     if (logdir / "latest.pt").exists():
         checkpoint = torch.load(logdir / "latest.pt")
