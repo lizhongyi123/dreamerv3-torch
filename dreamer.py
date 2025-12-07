@@ -340,9 +340,7 @@ def main(config):
 
     print(301,train_envs[0].observation_space,
         train_envs[0].action_space,)
-<<<<<<< HEAD
 
-=======
     # Dict(height: Box(-inf, inf, (1,), float32),
     # image: Box(0, 255, (64, 64, 3), uint8),
     # orientations: Box(-inf, inf, (14,), float32),
@@ -357,7 +355,7 @@ def main(config):
     #     'is_first': [16, 50],  # 标记序列起点
     #     ...
     # }
->>>>>>> 0ae6ec6eac057dce572adab38dd7f25f7ab0b49e
+
     agent = Dreamer(
         train_envs[0].observation_space,
         train_envs[0].action_space,
