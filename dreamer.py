@@ -40,7 +40,7 @@ class Dreamer(nn.Module):
         self._should_reset = tools.Every(config.reset_every)
         self._should_expl = tools.Until(int(config.expl_until / config.action_repeat))
         self._metrics = {}
-        # this is update step
+        # this is update step 环境步数计数器
         self._step = logger.step // config.action_repeat
         self._update_count = 0
         self._dataset = dataset
@@ -98,11 +98,12 @@ class Dreamer(nn.Module):
 
             latent, action = state
         obs = self._wm.preprocess(obs)    #xt
-        embed = self._wm.encoder(obs)
+        embed = self._wm.encoder(obs)      #zt
+        #latent ht
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
-        feat = self._wm.dynamics.get_feat(latent)  #v zt
+        feat = self._wm.dynamics.get_feat(latent)  # zt^ st=(ht,zt）
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
@@ -132,6 +133,7 @@ class Dreamer(nn.Module):
             self._wm.dynamics.get_feat(s)
         ).mode()
         metrics.update(self._task_behavior._train(start, reward)[-1])
+
         if self._config.expl_behavior != "greedy":
             mets = self._expl_behavior.train(start, context, data)[-1]
             metrics.update({"expl_" + key: value for key, value in mets.items()})
@@ -321,15 +323,15 @@ def main(config):
         #                     [-0.6779, -0.4355, 0.3632, 0.8304, -0.2058, 0.7483]]),
         #   'logprob': tensor([-4.1589, -4.1589, -4.1589, -4.1589])}, None)
         #
-        # state = tools.simulate(
-        #     random_agent,
-        #     train_envs,
-        #     train_eps,
-        #     config.traindir,
-        #     logger,
-        #     limit=config.dataset_size,
-        #     steps=prefill,
-        # )
+        state = tools.simulate(
+            random_agent,
+            train_envs,
+            train_eps,
+            config.traindir,
+            logger,
+            limit=config.dataset_size,
+            steps=prefill,
+        )
         logger.step += prefill * config.action_repeat
         print(f"Logger: ({logger.step} steps).")
 
@@ -405,6 +407,7 @@ def main(config):
             "optims_state_dict": tools.recursively_collect_optim_state_dict(agent),
         }
         torch.save(items_to_save, logdir / "latest.pt")
+
     for env in train_envs + eval_envs:
         try:
             env.close()

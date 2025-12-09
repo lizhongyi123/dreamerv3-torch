@@ -184,6 +184,9 @@ def simulate(
 
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
+        # print(obs["height"].shape)
+        # # sys.exit()
+
         action, agent_state = agent(obs, done, agent_state)
         if isinstance(action, dict):
             action = [
@@ -202,12 +205,17 @@ def simulate(
         # step envs
         results = [e.step(a) for e, a in zip(envs, action)]
         results = [r() for r in results]
-
+        # print(205, results[0])
+        # print(206, results[0][:3])
+        #{}, 0.34599643117411505, False
         obs, reward, done = zip(*[p[:3] for p in results])
+        # print(209, reward, done)
+
         #这里的obs是一个字典
         #把四个结果汇总
         obs = list(obs)
-        print(obs)
+        # print(210, obs)
+
         # [{}, {}, {}]
         # sys.exit()
         reward = list(reward)
@@ -239,6 +247,7 @@ def simulate(
                 length = len(cache[envs[i].id]["reward"]) - 1
                 score = float(np.array(cache[envs[i].id]["reward"]).sum())
                 video = cache[envs[i].id]["image"]
+
                 # record logs given from environments
                 for key in list(cache[envs[i].id].keys()):
                     if "log_" in key:
