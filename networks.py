@@ -192,8 +192,8 @@ class RSSM(nn.Module):
                     val * (1.0 - is_first_r) + init_state[key] * is_first_r
                 )
 
-        prior = self.img_step(prev_state, prev_action)
-        x = torch.cat([prior["deter"], embed], -1)
+        prior = self.img_step(prev_state, prev_action)   #ht
+        x = torch.cat([prior["deter"], embed], -1)  #ht
         # (batch_size, prior_deter + embed) -> (batch_size, hidden)
         x = self._obs_out_layers(x)
         # (batch_size, hidden) -> (batch_size, stoch, discrete_num)
@@ -202,6 +202,8 @@ class RSSM(nn.Module):
             stoch = self.get_dist(stats).sample()
         else:
             stoch = self.get_dist(stats).mode()
+
+        #stoch zt^  deter：ht
         post = {"stoch": stoch, "deter": prior["deter"], **stats}
         return post, prior
 

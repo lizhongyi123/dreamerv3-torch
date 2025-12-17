@@ -83,7 +83,8 @@ class Dreamer(nn.Module):
                 self._logger.write(fps=True)
 
         policy_output, state = self._policy(obs, state, training)
-
+        # policy_output = {"action": action, "logprob": logprob}
+        # state = (latent, action)
         if training:
             self._step += len(reset)
             self._logger.step = self._config.action_repeat * self._step
@@ -100,10 +101,14 @@ class Dreamer(nn.Module):
         obs = self._wm.preprocess(obs)    #xt
         embed = self._wm.encoder(obs)      #zt
         #latent ht
+
+        # post["deter"] = ℎ𝑡
+        # post["stoch"] = 𝑧𝑡
+
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
-        feat = self._wm.dynamics.get_feat(latent)  # zt^ st=(ht,zt）
+        feat = self._wm.dynamics.get_feat(latent)  # st=(ht,zt）
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
@@ -126,6 +131,14 @@ class Dreamer(nn.Module):
 
     def _train(self, data):
         metrics = {}
+        # data = {
+        #     'image': [16, 50, H, W, C],  # 图像序列
+        #     'action': [16, 50, act_dim],  # 动作序列
+        #     'reward': [16, 50],  # 回报序列
+        #     'discount': [16, 50],  # 折扣因子
+        #     'is_first': [16, 50],  # 标记序列起点
+        #     ...
+        # }
         post, context, mets = self._wm._train(data)
         metrics.update(mets)
         start = post

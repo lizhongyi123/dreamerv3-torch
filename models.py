@@ -106,10 +106,12 @@ class WorldModel(nn.Module):
         )
 
     def _train(self, data):
-        # action (batch_size, batch_length, act_dim)
-        # image (batch_size, batch_length, h, w, ch)
-        # reward (batch_size, batch_length)
-        # discount (batch_size, batch_length)
+        # "image": (B, T, H, W, C)
+        # "action": (B, T, act_dim)
+        # "reward": (B, T)
+        # "discount": (B, T)
+        # "is_first": (B, T)episode起点标记
+        # "is_terminal": (B, T)episode终点标记
         data = self.preprocess(data)
 
         with tools.RequiresGrad(self):
@@ -131,6 +133,7 @@ class WorldModel(nn.Module):
                     feat = self.dynamics.get_feat(post)
                     feat = feat if grad_head else feat.detach()
                     pred = head(feat)
+                    # {"image": Dist, ...} preds里面，key对应数据名："image", "reward", "cont"等
                     if type(pred) is dict:
                         preds.update(pred)
                     else:
@@ -200,7 +203,10 @@ class WorldModel(nn.Module):
         ]
         reward_post = self.heads["reward"](self.dynamics.get_feat(states)).mode()[:6]
         init = {k: v[:, -1] for k, v in states.items()}
+
+        # 只看init和后续动作，不再用embed，用RSSM的prior动力学：
         prior = self.dynamics.imagine_with_action(data["action"][:6, 5:], init)
+
         openl = self.heads["decoder"](self.dynamics.get_feat(prior))["image"].mode()
         reward_prior = self.heads["reward"](self.dynamics.get_feat(prior)).mode()
         # observed image is given until 5 steps
