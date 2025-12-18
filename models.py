@@ -126,8 +126,10 @@ class WorldModel(nn.Module):
                 kl_loss, kl_value, dyn_loss, rep_loss = self.dynamics.kl_loss(
                     post, prior, kl_free, dyn_scale, rep_scale
                 )
+
                 assert kl_loss.shape == embed.shape[:2], kl_loss.shape
                 preds = {}
+
                 for name, head in self.heads.items():
                     grad_head = name in self._config.grad_heads
                     feat = self.dynamics.get_feat(post)
@@ -138,11 +140,13 @@ class WorldModel(nn.Module):
                         preds.update(pred)
                     else:
                         preds[name] = pred
+                        #name decoder: {} reward: cont:
                 losses = {}
                 for name, pred in preds.items():
                     loss = -pred.log_prob(data[name])
                     assert loss.shape == embed.shape[:2], (name, loss.shape)
                     losses[name] = loss
+
                 scaled = {
                     key: value * self._scales.get(key, 1.0)
                     for key, value in losses.items()
