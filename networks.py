@@ -6,10 +6,10 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch import distributions as torchd
-
+import sys
 import tools
 
-
+from utils_.exit_program import sp
 class RSSM(nn.Module):
     def __init__(
         self,
@@ -97,6 +97,19 @@ class RSSM(nn.Module):
             )
 
     def initial(self, batch_size):
+        #连续版
+        # {
+        #     mean: [B, stoch],
+        #     std: [B, stoch],
+        #     stoch: [B, stoch],
+        #     deter: [B, deter]
+        # }
+        # #离散版
+        # {
+        #     logit: [B, stoch, discrete],
+        #     stoch: [B, stoch, discrete],
+        #     deter: [B, deter]
+        # }
         deter = torch.zeros(batch_size, self._deter, device=self._device)
         if self._discrete:
             state = dict(
@@ -125,10 +138,18 @@ class RSSM(nn.Module):
             raise NotImplementedError(self._initial)
 
     def observe(self, embed, action, is_first, state=None):
+        print(141, embed.size(), action.size(), is_first.size())
+        #141 torch.Size([6, 5, 4096]) torch.Size([6, 5, 6]) torch.Size([6, 5])
         swap = lambda x: x.permute([1, 0] + list(range(2, len(x.shape))))
         # (batch, time, ch) -> (time, batch, ch)
         embed, action, is_first = swap(embed), swap(action), swap(is_first)
         # prev_state[0] means selecting posterior of return(posterior, prior) from obs_step
+        # 原来：embed是[B, T, E]
+        # 变成：[T, B, E]
+        # action同理：[T, B, A]
+        # is_first：[T, B]
+        print(149, embed.size(), action.size(), is_first.size())
+        #149 torch.Size([5, 6, 4096]) torch.Size([5, 6, 6]) torch.Size([5, 6])
         post, prior = tools.static_scan(
             lambda prev_state, prev_act, embed, is_first: self.obs_step(
                 prev_state[0], prev_act, embed, is_first
@@ -138,8 +159,8 @@ class RSSM(nn.Module):
         )
 
         # (batch, time, stoch, discrete_num) -> (batch, time, stoch, discrete_num)
-        post = {k: swap(v) for k, v in post.items()}
-        prior = {k: swap(v) for k, v in prior.items()}
+        post = {k: swap(v) for k, v in post.items()} #s_t = q(s_t | s_{t-1}, a_{t-1}, o_t)
+        prior = {k: swap(v) for k, v in prior.items()}  #s_t = p(s_t | s_{t-1}, a_{t-1})
         return post, prior
 
     def imagine_with_action(self, action, state):
@@ -178,7 +199,7 @@ class RSSM(nn.Module):
             prev_action = torch.zeros(
                 (len(is_first), self._num_actions), device=self._device
             )
-        # overwrite the prev_state only where is_first=True
+        # overwrite the prev_state only0 where is_first=True
         elif torch.sum(is_first) > 0:
             is_first = is_first[:, None]
             prev_action *= 1.0 - is_first
@@ -191,9 +212,18 @@ class RSSM(nn.Module):
                 prev_state[key] = (
                     val * (1.0 - is_first_r) + init_state[key] * is_first_r
                 )
+        # print(prev_state.keys())
+        # for i in prev_state.keys():
+        #     print(prev_state[i].shape)
+        # sp()
+        # dict_keys(['logit', 'stoch', 'deter'])
+        # torch.Size([4, 32, 32])
+        # torch.Size([4, 32, 32])
+        # torch.Size([4, 512])
+        #
 
-        prior = self.img_step(prev_state, prev_action)   #ht
-        x = torch.cat([prior["deter"], embed], -1)  #ht
+        prior = self.img_step(prev_state, prev_action)   #ht = f(ht-1, zt-1,at-1),先验
+        x = torch.cat([prior["deter"], embed], -1)  #ht, xt
         # (batch_size, prior_deter + embed) -> (batch_size, hidden)
         x = self._obs_out_layers(x)
         # (batch_size, hidden) -> (batch_size, stoch, discrete_num)
@@ -203,7 +233,7 @@ class RSSM(nn.Module):
         else:
             stoch = self.get_dist(stats).mode()
 
-        #stoch zt^  deter：ht
+        # stoch: zt deter:ht
         post = {"stoch": stoch, "deter": prior["deter"], **stats}
         return post, prior
 
@@ -212,10 +242,10 @@ class RSSM(nn.Module):
         prev_stoch = prev_state["stoch"]
         if self._discrete:
             shape = list(prev_stoch.shape[:-2]) + [self._stoch * self._discrete]
-            # (batch, stoch, discrete_num) -> (batch, stoch * discrete_num)
+            # (batch, stoch, discrete_num) -> (batch, stoch * discrete_num) [32, 1024]
             prev_stoch = prev_stoch.reshape(shape)
         # (batch, stoch * discrete_num) -> (batch, stoch * discrete_num + action)
-        x = torch.cat([prev_stoch, prev_action], -1)
+        x = torch.cat([prev_stoch, prev_action], -1)  #(32, 1030)
         # (batch, stoch * discrete_num + action, embed) -> (batch, hidden)
         x = self._img_in_layers(x)
         for _ in range(self._rec_depth):  # rec depth is not correctly implemented
@@ -350,12 +380,16 @@ class MultiEncoder(nn.Module):
     def forward(self, obs):
         outputs = []
         if self.cnn_shapes:
+            # print(380)
             inputs = torch.cat([obs[k] for k in self.cnn_shapes], -1)
             outputs.append(self._cnn(inputs))
         if self.mlp_shapes:
+            # print(384)
             inputs = torch.cat([obs[k] for k in self.mlp_shapes], -1)
             outputs.append(self._mlp(inputs))
         outputs = torch.cat(outputs, -1)
+        # print(outputs.shape)
+        # sys.exit()
         return outputs
 
 

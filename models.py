@@ -179,6 +179,14 @@ class WorldModel(nn.Module):
 
     # this function is called during both rollout and training
     def preprocess(self, obs):
+        # {
+        #     image: [16, 50, 64, 64, 3],
+        #     action: [16, 50, 6],
+        #     reward: [16, 50],
+        #     discount: [16, 50],
+        #     is_first: [16, 50],
+        #     ...
+        # }
         obs = {
             k: torch.tensor(v, device=self._config.device, dtype=torch.float32)
             for k, v in obs.items()
@@ -192,7 +200,7 @@ class WorldModel(nn.Module):
         assert "is_first" in obs
         # 'is_terminal' is necesarry to train cont_head
         assert "is_terminal" in obs
-        obs["cont"] = (1.0 - obs["is_terminal"]).unsqueeze(-1)
+        obs["cont"] = (1.0 - obs["is_terminal"]).unsqueeze(-1)  #ct
         return obs
 
     def video_pred(self, data):
@@ -311,6 +319,7 @@ class ImagBehavior(nn.Module):
                 actor_ent = self.actor(imag_feat).entropy()
                 state_ent = self._world_model.dynamics.get_dist(imag_state).entropy()
                 # this target is not scaled by ema or sym_log.
+                #target R
                 target, weights, base = self._compute_target(
                     imag_feat, imag_state, reward
                 )
@@ -365,7 +374,7 @@ class ImagBehavior(nn.Module):
             feat = dynamics.get_feat(state)
             inp = feat.detach()
             action = policy(inp).sample()
-            succ = dynamics.img_step(state, action)
+            succ = dynamics.img_step(state, action) #prior
             return succ, feat, action
 
         succ, feats, actions = tools.static_scan(
@@ -431,6 +440,7 @@ class ImagBehavior(nn.Module):
             )
             mix = self._config.imag_gradient_mix
             actor_target = mix * target + (1 - mix) * actor_target
+            # gt = aRt + (1 - a)log π(a|st).g(Rt - phi(st))
             metrics["imag_gradient_mix"] = mix
         else:
             raise NotImplementedError(self._config.imag_gradient)

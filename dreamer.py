@@ -3,7 +3,7 @@ import functools
 import os
 import pathlib
 import sys
-
+from utils_.exit_program import sp
 if os.name == "nt":
     os.environ["MUJOCO_GL"] = "glfw"
 else:
@@ -61,6 +61,13 @@ class Dreamer(nn.Module):
         )[config.expl_behavior]().to(self._config.device)
 
     def __call__(self, obs, reset, state=None, training=True):
+        # print("64"*50)
+        # for i in obs.keys():
+        #     print(i, obs[i].shape)
+        # print(reset)
+        # print(state)
+        #
+        # sp()
         step = self._step
         if training:
             steps = (
@@ -81,8 +88,9 @@ class Dreamer(nn.Module):
                     openl = self._wm.video_pred(next(self._dataset))
                     self._logger.video("train_openl", to_np(openl))
                 self._logger.write(fps=True)
-
+        # print(obs, state, training) None False
         policy_output, state = self._policy(obs, state, training)
+        # sp()
         # policy_output = {"action": action, "logprob": logprob}
         # state = (latent, action)
         if training:
@@ -99,12 +107,12 @@ class Dreamer(nn.Module):
 
             latent, action = state
         obs = self._wm.preprocess(obs)    #xt
-        embed = self._wm.encoder(obs)      #zt
+        embed = self._wm.encoder(obs)      #et
         #latent ht
 
         # post["deter"] = ℎ𝑡
         # post["stoch"] = 𝑧𝑡
-
+        # post = {"stoch": stoch, "deter": prior["deter"], **stats}
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
@@ -140,11 +148,14 @@ class Dreamer(nn.Module):
         #     ...
         # }
         post, context, mets = self._wm._train(data)
+        #{stoch： 【】， deter：【】}
         metrics.update(mets)
         start = post
         reward = lambda f, s, a: self._wm.heads["reward"](
             self._wm.dynamics.get_feat(s)
         ).mode()
+
+        #训练策略，也就是a, c
         metrics.update(self._task_behavior._train(start, reward)[-1])
 
         if self._config.expl_behavior != "greedy":
@@ -162,7 +173,6 @@ def count_steps(folder):
 
 
 def make_dataset(episodes, config):
-    print(145)
     generator = tools.sample_episodes(episodes, config.batch_length)
     dataset = tools.from_generator(generator, config.batch_size)
     return dataset
@@ -299,11 +309,13 @@ def main(config):
     #只有离散动作空间才有.n属性
     config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]  #6
     state = None
-    print(264, config.offline_traindir)
+    # print(264, config.offline_traindir)
 
-    if 0:
-    # if not config.offline_traindir:
-        print(278)
+
+    # if 0:
+    print(306, config.offline_traindir)
+    if not config.offline_traindir:
+
         prefill = max(0, config.prefill - count_steps(config.traindir))
         print(f"Prefill dataset ({prefill} steps).")
         if hasattr(acts, "discrete"):
@@ -337,6 +349,7 @@ def main(config):
         #                     [-0.6779, -0.4355, 0.3632, 0.8304, -0.2058, 0.7483]]),
         #   'logprob': tensor([-4.1589, -4.1589, -4.1589, -4.1589])}, None)
         #
+
         state = tools.simulate(
             random_agent,
             train_envs,
@@ -349,14 +362,22 @@ def main(config):
         logger.step += prefill * config.action_repeat
         print(f"Logger: ({logger.step} steps).")
 
-    print("Simulate agent.")
 
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
-
+    print(360, state)
     print(301,train_envs[0].observation_space,
         train_envs[0].action_space,)
 
+    v_data = next(train_dataset)
+    keys = v_data.keys()
+    for i in keys:
+        print(i, v_data[i].shape)
+
+    # print(next(train_dataset).keys())
+    # print(next(train_dataset)["image"].shape)
+
+    # sys.exit()
     # Dict(height: Box(-inf, inf, (1,), float32),
     # image: Box(0, 255, (64, 64, 3), uint8),
     # orientations: Box(-inf, inf, (14,), float32),
@@ -406,10 +427,10 @@ def main(config):
             eval_policy = functools.partial(agent, training=False)
             tools.simulate(
                 eval_policy,
-                eval_envs,
-                eval_eps,
-                config.evaldir,
-                logger,
+                eval_envs, #环境
+                eval_eps,  #历史记录
+                config.evaldir,   #要保存的文件夹
+                logger,         #logger的信息
                 is_eval=True,
                 episodes=config.eval_episode_num,
             )
@@ -466,11 +487,12 @@ if __name__ == "__main__":
                 base[key] = value
 
     name_list = ["defaults", *args.configs] if args.configs else ["defaults"]
-
+    # print(469, name_list)
     defaults = {}
     for name in name_list:
         recursive_update(defaults, configs[name])
-    # print(393, defaults)
+
+
     parser = argparse.ArgumentParser()
 
 

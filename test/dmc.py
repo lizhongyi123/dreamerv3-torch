@@ -56,6 +56,10 @@ print("动作空间 shape:", action_space.shape)
 print("动作空间 low:", action_space.low)
 print("动作空间 high:", action_space.high)
 
+observation_space = env.observation_space
+print("观测空间 shape:", observation_space.shape)
+
+
 # 4. 构造一个“传递给环境的动作”
 
 ## (1) 全 0 动作（不动）
@@ -68,6 +72,20 @@ print("Random action:", random_action)
 random_action = np.array([0.99] * 6, dtype=np.float32)
 # 5. 把动作传入环境（先用随机动作做一步）
 obs2, reward, done, info = env.step(random_action)
+
+# obs2 {'orientations': array([ 0.79765275,  0.60311697,  0.62859231, -0.77773499,  0.99968141,
+#        -0.02524055,  0.77432535, -0.63278768,  0.9333928 , -0.35885635,
+#         0.84873123,  0.52882445,  0.99994606,  0.01038635]), 'height': [np.float64(1.250025984383268)],
+#         'velocity': array([-2.0576456 ,  0.64206282, 12.48529139, 13.05465391,  8.64247644,
+#        22.03125498, 16.30065504,  2.89172307, 23.50232999]), 'image': array([[[ 50,  72,  94],
+
+#  ], shape=(64, 64, 3), dtype=uint8), 'is_terminal': False, 'is_first': False}
+
+# 执行一步后的：
+# reward: 0.34811907157846567
+# done: False
+# info: {'discount': array(1., dtype=float32)}
+
 print("obs2", obs2)
 print("\n执行一步后的：")
 print("reward:", reward)

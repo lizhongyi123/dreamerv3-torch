@@ -133,7 +133,7 @@ def simulate(
     directory,
     logger,
     is_eval=False,
-    limit=None,
+    limit=None, #数据总步数
     steps=0,
     episodes=0,
     state=None,
@@ -151,14 +151,21 @@ def simulate(
     else:
         step, episode, done, length, obs, agent_state, reward = state
     while (steps and step < steps) or (episodes and episode < episodes):
-        # reset envs if necessary
+        # reset envs if necessary如果有一个环境结束了，就重置哪个环境
         if done.any():
             indices = [index for index, d in enumerate(done) if d]
+            #4个环境，所以是【0,1,2,3】
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
 
+            # print(results)
             # results = [
-            #     {'image': ..., 'height': ..., 'velocity': ...},
+            # {'orientations': array([0.95333378, 0.30191837, 0.66588346, -0.74605578, 0.98049261,
+            #                         0.19655593, 0.99190299, 0.12699786, 0.97331636, -0.22946735,
+            #                         0.76772275, 0.64078217, 0.70131598, 0.71285055]), 'height': [np.float64(1.3)],
+            #  'velocity': array([0., 0., 0., 0., 0., 0., 0., 0., 0.]), 'image': array([[
+            #  'is_terminal': False, 'is_first': True},
+
             #     {...},
             #     ...
             # ]
@@ -183,10 +190,19 @@ def simulate(
                 obs[index] = result
 
         # step agents
-        obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
-        # print(obs["height"].shape)
-        # # sys.exit()
 
+        obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
+        # print(193, obs, )
+        # sys.exit()
+        # print(obs["height"].shape)
+        # print("*" * 30)
+        # print(obs, len(obs))
+        # sys.exit()
+        # obs["image"]形状会变成(num_envs, 64, 64, 3)
+        # obs["velocity"]变成(num_envs, 9)
+        # obs["height"]可能变成(num_envs, 1)（取决于convert）
+        # print(done)
+        # sys.exit()
         action, agent_state = agent(obs, done, agent_state)
         if isinstance(action, dict):
             action = [
@@ -198,13 +214,14 @@ def simulate(
         # print(action)
         # [{'action': array([0.97897524, 0.864036, -0.6124351, -0.9799949, 0.03464929,
         #                    -0.99895436], dtype=float32),
-        #                    'logprob': array(6.914168, dtype=float32)},
+        #                    'logprob': array(6.914168, dtype=float32)},{},{},{}]
 
 
         assert len(action) == len(envs)
         # step envs
         results = [e.step(a) for e, a in zip(envs, action)]
         results = [r() for r in results]
+        #obs2, reward, done, info
         # print(205, results[0])
         # print(206, results[0][:3])
         #{}, 0.34599643117411505, False
@@ -214,6 +231,7 @@ def simulate(
         #这里的obs是一个字典
         #把四个结果汇总
         obs = list(obs)
+
         # print(210, obs)
 
         # [{}, {}, {}]
@@ -310,6 +328,10 @@ def add_to_cache(cache, id, transition):
 
 def erase_over_episodes(cache, dataset_size):
     step_in_dataset = 0
+
+    # sorted(cache) → 按时间排序
+    # reversed → 从最新episode开始
+
     for key, ep in reversed(sorted(cache.items(), key=lambda x: x[0])):
         if (
             not dataset_size
@@ -868,6 +890,10 @@ def static_scan(fn, inputs, start):
     for index in indices:
         inp = lambda x: (_input[x] for _input in inputs)
         last = fn(last, *inp(index))
+        # print(last)
+        # print(893, flag) #True
+        # print(893, type(last),type(last) == type({})) #True
+
         if flag:
             if type(last) == type({}):
                 outputs = {
@@ -877,6 +903,8 @@ def static_scan(fn, inputs, start):
                 outputs = []
                 for _last in last:
                     if type(_last) == type({}):
+                        # print(905, _last)
+                        # sys.exit()
                         outputs.append(
                             {
                                 key: value.clone().unsqueeze(0)
@@ -884,6 +912,8 @@ def static_scan(fn, inputs, start):
                             }
                         )
                     else:
+                        # print(913)
+                        # sys.exit()
                         outputs.append(_last.clone().unsqueeze(0))
             flag = False
         else:
