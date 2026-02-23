@@ -4,7 +4,7 @@ from torch import nn
 
 import networks
 import tools
-
+import sys
 to_np = lambda x: x.detach().cpu().numpy()
 
 
@@ -112,14 +112,23 @@ class WorldModel(nn.Module):
         # "discount": (B, T)
         # "is_first": (B, T)episode起点标记
         # "is_terminal": (B, T)episode终点标记
+
         data = self.preprocess(data)
+        # for i in data.keys():
+        #     print(i, data[i].size())
+        # sys.exit()
+        #print(data["action"].size()) 16/64/6
 
         with tools.RequiresGrad(self):
             with torch.cuda.amp.autocast(self._use_amp):
-                embed = self.encoder(data)
+                embed = self.encoder(data) #[16, 64, 4096]
+                # print(125, embed.size()) #[16, 64, 4096]
                 post, prior = self.dynamics.observe(
                     embed, data["action"], data["is_first"]
                 )
+                # for i in post.keys():
+                #     print(i, post[i].size())
+                # sys.exit()
                 kl_free = self._config.kl_free
                 dyn_scale = self._config.dyn_scale
                 rep_scale = self._config.rep_scale
@@ -316,6 +325,12 @@ class ImagBehavior(nn.Module):
                     start, self.actor, self._config.imag_horizon
                 )
                 reward = objective(imag_feat, imag_state, imag_action)
+                # print(start["stoch"].size()) #torch.Size([16, 64, 32, 32])
+                # print(328, reward.size())  #torch.Size([15, 1024, 1])
+                # print(329, imag_feat.size()) #torch.Size([15, 1024, 1536])
+                # print(330, imag_state["stoch"].size()) #torch.Size([15, 1024, 32, 32])
+                # print(331, imag_action.size()) #torch.Size([15, 1024, 6])
+                # sys.exit()
                 actor_ent = self.actor(imag_feat).entropy()
                 state_ent = self._world_model.dynamics.get_dist(imag_state).entropy()
                 # this target is not scaled by ema or sym_log.
@@ -323,6 +338,7 @@ class ImagBehavior(nn.Module):
                 target, weights, base = self._compute_target(
                     imag_feat, imag_state, reward
                 )
+                sys.exit()
                 actor_loss, mets = self._compute_actor_loss(
                     imag_feat,
                     imag_action,
@@ -380,15 +396,18 @@ class ImagBehavior(nn.Module):
         succ, feats, actions = tools.static_scan(
             step, [torch.arange(horizon)], (start, None, None)
         )
+
         states = {k: torch.cat([start[k][None], v[:-1]], 0) for k, v in succ.items()}
 
         return feats, states, actions
 
     def _compute_target(self, imag_feat, imag_state, reward):
         if "cont" in self._world_model.heads:
+            print(405)
             inp = self._world_model.dynamics.get_feat(imag_state)
             discount = self._config.discount * self._world_model.heads["cont"](inp).mean
         else:
+            print(409)
             discount = self._config.discount * torch.ones_like(reward)
         value = self.value(imag_feat).mode()
         target = tools.lambda_return(

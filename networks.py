@@ -138,7 +138,8 @@ class RSSM(nn.Module):
             raise NotImplementedError(self._initial)
 
     def observe(self, embed, action, is_first, state=None):
-        print(141, embed.size(), action.size(), is_first.size())
+        # print(141, embed.size(), action.size(), is_first.size())
+
         #141 torch.Size([6, 5, 4096]) torch.Size([6, 5, 6]) torch.Size([6, 5])
         swap = lambda x: x.permute([1, 0] + list(range(2, len(x.shape))))
         # (batch, time, ch) -> (time, batch, ch)
@@ -148,7 +149,7 @@ class RSSM(nn.Module):
         # 变成：[T, B, E]
         # action同理：[T, B, A]
         # is_first：[T, B]
-        print(149, embed.size(), action.size(), is_first.size())
+        # print(149, embed.size(), action.size(), is_first.size())
         #149 torch.Size([5, 6, 4096]) torch.Size([5, 6, 6]) torch.Size([5, 6])
         post, prior = tools.static_scan(
             lambda prev_state, prev_act, embed, is_first: self.obs_step(
@@ -173,7 +174,7 @@ class RSSM(nn.Module):
         return prior
 
     def get_feat(self, state):
-        stoch = state["stoch"]
+        stoch = state["stoch"] #zt
         if self._discrete:
             shape = list(stoch.shape[:-2]) + [self._stoch * self._discrete]
             stoch = stoch.reshape(shape)
@@ -239,13 +240,13 @@ class RSSM(nn.Module):
 
     def img_step(self, prev_state, prev_action, sample=True):
         # (batch, stoch, discrete_num)
-        prev_stoch = prev_state["stoch"]
+        prev_stoch = prev_state["stoch"]  #zt
         if self._discrete:
             shape = list(prev_stoch.shape[:-2]) + [self._stoch * self._discrete]
             # (batch, stoch, discrete_num) -> (batch, stoch * discrete_num) [32, 1024]
             prev_stoch = prev_stoch.reshape(shape)
         # (batch, stoch * discrete_num) -> (batch, stoch * discrete_num + action)
-        x = torch.cat([prev_stoch, prev_action], -1)  #(32, 1030)
+        x = torch.cat([prev_stoch, prev_action], -1)  #(32, 1030) z,a
         # (batch, stoch * discrete_num + action, embed) -> (batch, hidden)
         x = self._img_in_layers(x)
         for _ in range(self._rec_depth):  # rec depth is not correctly implemented
@@ -642,6 +643,25 @@ class MLP(nn.Module):
         device="cuda",
         name="NoName",
     ):
+
+        print("inp_dim =", inp_dim)
+        print("shape =", shape)
+        print("layers =", layers)
+        print("units =", units)
+        print("act =", act)
+        print("norm =", norm)
+        print("dist =", dist)
+        print("std =", std)
+        print("min_std =", min_std)
+        print("max_std =", max_std)
+        print("absmax =", absmax)
+        print("temp =", temp)
+        print("unimix_ratio =", unimix_ratio)
+        print("outscale =", outscale)
+        print("symlog_inputs =", symlog_inputs)
+        print("device =", device)
+        print("name =", name)
+
         super(MLP, self).__init__()
         self._shape = (shape,) if isinstance(shape, int) else shape
         if self._shape is not None and len(self._shape) == 0:
@@ -689,6 +709,8 @@ class MLP(nn.Module):
                 assert dist in ("tanh_normal", "normal", "trunc_normal", "huber"), dist
                 self.std_layer = nn.Linear(units, np.prod(self._shape))
                 self.std_layer.apply(tools.uniform_weight_init(outscale))
+
+
 
     def forward(self, features, dtype=None):
         x = features

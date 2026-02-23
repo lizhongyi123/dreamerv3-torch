@@ -889,9 +889,10 @@ def static_scan(fn, inputs, start):
     flag = True
     for index in indices:
         inp = lambda x: (_input[x] for _input in inputs)
-        last = fn(last, *inp(index))
-        # print(last)
+        last = fn(last, *inp(index))  #*inp(index)  [a[0], e[0], is_first[0]] last ht,zt
+        # print(893, last) #({stoch: [], deter, logit} ,{stoch: [], deter, logit} )
         # print(893, flag) #True
+        # sys.exit()
         # print(893, type(last),type(last) == type({})) #True
 
         if flag:

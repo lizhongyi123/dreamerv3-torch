@@ -151,10 +151,11 @@ class Dreamer(nn.Module):
         #{stoch： 【】， deter：【】}
         metrics.update(mets)
         start = post
+
         reward = lambda f, s, a: self._wm.heads["reward"](
             self._wm.dynamics.get_feat(s)
         ).mode()
-
+        print(158, "*"*50)
         #训练策略，也就是a, c
         metrics.update(self._task_behavior._train(start, reward)[-1])
 
@@ -313,7 +314,7 @@ def main(config):
 
 
     # if 0:
-    print(306, config.offline_traindir)
+    # print(306, config.offline_traindir)
     if not config.offline_traindir:
 
         prefill = max(0, config.prefill - count_steps(config.traindir))
@@ -365,9 +366,9 @@ def main(config):
 
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
-    print(360, state)
-    print(301,train_envs[0].observation_space,
-        train_envs[0].action_space,)
+    # print(360, state)
+    # print(301,train_envs[0].observation_space,
+    #     train_envs[0].action_space,)
 
     v_data = next(train_dataset)
     keys = v_data.keys()
