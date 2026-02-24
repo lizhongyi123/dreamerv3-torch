@@ -18,7 +18,7 @@ class RewardEMA:
 
     def __call__(self, x, ema_vals):
         flat_x = torch.flatten(x.detach())
-        x_quantile = torch.quantile(input=flat_x, q=self.range)
+        x_quantile = torch.quantile(input=flat_x, q=self.range)  #【0.05的值，0.95的值】
         # this should be in-place operation
         ema_vals[:] = self.alpha * x_quantile + (1 - self.alpha) * ema_vals
         scale = torch.clip(ema_vals[1] - ema_vals[0], min=1.0)
@@ -123,6 +123,9 @@ class WorldModel(nn.Module):
             with torch.cuda.amp.autocast(self._use_amp):
                 embed = self.encoder(data) #[16, 64, 4096]
                 # print(125, embed.size()) #[16, 64, 4096]
+                # print(126, data["action"].size())
+                # print(127, data["action"])
+                # sys.exit()
                 post, prior = self.dynamics.observe(
                     embed, data["action"], data["is_first"]
                 )
@@ -139,7 +142,9 @@ class WorldModel(nn.Module):
                 assert kl_loss.shape == embed.shape[:2], kl_loss.shape
                 preds = {}
 
+                print(145, "*" * 50)
                 for name, head in self.heads.items():
+                    print(name)
                     grad_head = name in self._config.grad_heads
                     feat = self.dynamics.get_feat(post)
                     feat = feat if grad_head else feat.detach()
@@ -150,6 +155,7 @@ class WorldModel(nn.Module):
                     else:
                         preds[name] = pred
                         #name decoder: {} reward: cont:
+
                 losses = {}
                 for name, pred in preds.items():
                     loss = -pred.log_prob(data[name])
@@ -338,7 +344,7 @@ class ImagBehavior(nn.Module):
                 target, weights, base = self._compute_target(
                     imag_feat, imag_state, reward
                 )
-                sys.exit()
+
                 actor_loss, mets = self._compute_actor_loss(
                     imag_feat,
                     imag_action,
@@ -411,13 +417,13 @@ class ImagBehavior(nn.Module):
             discount = self._config.discount * torch.ones_like(reward)
         value = self.value(imag_feat).mode()
         target = tools.lambda_return(
-            reward[1:],
-            value[:-1],
-            discount[1:],
+            reward[1:],  #rt
+            value[:-1],  #Rt
+            discount[1:],  #gamma
             bootstrap=value[-1],
             lambda_=self._config.discount_lambda,
             axis=0,
-        )
+        ) #文章中的Rt lambda
         weights = torch.cumprod(
             torch.cat([torch.ones_like(discount[:1]), discount[:-1]], 0), 0
         ).detach()
@@ -446,6 +452,7 @@ class ImagBehavior(nn.Module):
             metrics["EMA_095"] = to_np(self.ema_vals[1])
 
         if self._config.imag_gradient == "dynamics":
+            #print(449) #经过这里
             actor_target = adv
         elif self._config.imag_gradient == "reinforce":
             actor_target = (
@@ -459,7 +466,7 @@ class ImagBehavior(nn.Module):
             )
             mix = self._config.imag_gradient_mix
             actor_target = mix * target + (1 - mix) * actor_target
-            # gt = aRt + (1 - a)log π(a|st).g(Rt - phi(st))
+            # gt = aRt + (1 - a)log π(a|st).g(Rt - v(st))
             metrics["imag_gradient_mix"] = mix
         else:
             raise NotImplementedError(self._config.imag_gradient)

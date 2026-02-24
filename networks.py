@@ -139,8 +139,7 @@ class RSSM(nn.Module):
 
     def observe(self, embed, action, is_first, state=None):
         # print(141, embed.size(), action.size(), is_first.size())
-
-        #141 torch.Size([6, 5, 4096]) torch.Size([6, 5, 6]) torch.Size([6, 5])
+        #141 torch.Size([16, 64, 4096]) torch.Size([16, 64, 6]) torch.Size([16, 64])
         swap = lambda x: x.permute([1, 0] + list(range(2, len(x.shape))))
         # (batch, time, ch) -> (time, batch, ch)
         embed, action, is_first = swap(embed), swap(action), swap(is_first)
@@ -458,6 +457,7 @@ class MultiDecoder(nn.Module):
     def forward(self, features):
         dists = {}
         if self.cnn_shapes:
+            print(460)
             feat = features
             outputs = self._cnn(feat)
             split_sizes = [v[-1] for v in self.cnn_shapes.values()]
@@ -469,6 +469,7 @@ class MultiDecoder(nn.Module):
                 }
             )
         if self.mlp_shapes:
+            print(472)
             dists.update(self._mlp(features))
         return dists
 
@@ -713,6 +714,7 @@ class MLP(nn.Module):
 
 
     def forward(self, features, dtype=None):
+
         x = features
         if self._symlog_inputs:
             x = tools.symlog(x)
@@ -721,6 +723,7 @@ class MLP(nn.Module):
         if self._shape is None:
             return out
         if isinstance(self._shape, dict):
+            print(725)
             dists = {}
             for name, shape in self._shape.items():
                 mean = self.mean_layer[name](out)
@@ -731,6 +734,7 @@ class MLP(nn.Module):
                 dists.update({name: self.dist(self._dist, mean, std, shape)})
             return dists
         else:
+            # print(736)
             mean = self.mean_layer(out)
             if self._std == "learned":
                 std = self.std_layer(out)

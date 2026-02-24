@@ -320,10 +320,12 @@ def main(config):
         prefill = max(0, config.prefill - count_steps(config.traindir))
         print(f"Prefill dataset ({prefill} steps).")
         if hasattr(acts, "discrete"):
+            # print(323)
             random_actor = tools.OneHotDist(
                 torch.zeros(config.num_actions).repeat(config.envs, 1)
             )
         else:
+            # print(328)
             random_actor = torchd.independent.Independent(
                 torchd.uniform.Uniform(
                     torch.tensor(acts.low).repeat(config.envs, 1),
