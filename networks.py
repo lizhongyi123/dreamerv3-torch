@@ -253,6 +253,16 @@ class RSSM(nn.Module):
             # (batch, hidden), (batch, deter) -> (batch, deter), (batch, deter)
             x, deter = self._cell(x, [deter])
             deter = deter[0]  # Keras wraps the state in a list.
+
+        # deter = prev_state["deter"]
+        # for _ in range(self._rec_depth):
+        #     x, deter = self._cell(x, [deter])
+        #     deter = deter[0]  # Keras cell returns [state]
+
+        # deter = prev_state["deter"]
+        # x, deter = self._cell(x, [deter])
+        # deter = deter[0]
+
         # (batch, deter) -> (batch, hidden)
         x = self._img_out_layers(x)
         # (batch, hidden) -> (batch_size, stoch, discrete_num)

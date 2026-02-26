@@ -348,7 +348,7 @@ class ImagBehavior(nn.Module):
                 actor_loss, mets = self._compute_actor_loss(
                     imag_feat,
                     imag_action,
-                    target,
+                    target, #Rt
                     weights,
                     base,
                 )
@@ -418,7 +418,7 @@ class ImagBehavior(nn.Module):
         value = self.value(imag_feat).mode()
         target = tools.lambda_return(
             reward[1:],  #rt
-            value[:-1],  #Rt
+            value[:-1],  #vt
             discount[1:],  #gamma
             bootstrap=value[-1],
             lambda_=self._config.discount_lambda,
